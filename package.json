@@ -1,0 +1,126 @@
+{
+  "name": "ini-brain-ai",
+  "displayName": "INI Brain AI",
+  "description": "Autonomous project scanner, local brain knowledge base, and multi-agent AI workflow for VS Code.",
+  "version": "1.1.0",
+  "publisher": "local",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other",
+    "AI",
+    "Machine Learning"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onView:projectBrain.sidebar",
+    "onCommand:projectBrain.scanProject",
+    "onCommand:projectBrain.rebuildBrain",
+    "onCommand:projectBrain.askAI",
+    "onCommand:projectBrain.generateProject",
+    "onCommand:projectBrain.autoMode",
+    "onCommand:projectBrain.openSettings",
+    "onCommand:projectBrain.generateAgentGuide",
+    "onCommand:projectBrain.copyContextForCline"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "projectBrain.scanProject",
+        "title": "INI Brain: Scan Project"
+      },
+      {
+        "command": "projectBrain.rebuildBrain",
+        "title": "INI Brain: Rebuild Brain"
+      },
+      {
+        "command": "projectBrain.askAI",
+        "title": "INI Brain: Ask AI"
+      },
+      {
+        "command": "projectBrain.generateProject",
+        "title": "INI Brain: Generate Project"
+      },
+      {
+        "command": "projectBrain.autoMode",
+        "title": "INI Brain: Auto Mode"
+      },
+      {
+        "command": "projectBrain.openSettings",
+        "title": "INI Brain: Settings"
+      },
+      {
+        "command": "projectBrain.generateAgentGuide",
+        "title": "INI Brain: Generate Agent Guide"
+      },
+      {
+        "command": "projectBrain.copyContextForCline",
+        "title": "INI Brain: Copy Context for Cline"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "projectBrain",
+          "title": "INI Brain AI",
+          "icon": "resources/brain.svg"
+        }
+      ]
+    },
+    "views": {
+      "projectBrain": [
+        {
+          "id": "projectBrain.sidebar",
+          "name": "Brain",
+          "type": "webview"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "INI Brain AI",
+      "properties": {
+        "projectBrain.apiBaseUrl": {
+          "type": "string",
+          "default": "https://api.puter.com/puterai/openai/v1/",
+          "description": "OpenAI-compatible API base URL."
+        },
+        "projectBrain.modelName": {
+          "type": "string",
+          "default": "anthropic/claude-3-5-sonnet",
+          "description": "Model name used by INI Brain AI."
+        },
+        "projectBrain.maxContextFiles": {
+          "type": "number",
+          "default": 12,
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Maximum relevant files injected into AI context."
+        },
+        "projectBrain.showOnboardingPrompt": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a prompt to scan and generate an AI agent guide when opening an uninitialized workspace."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package --no-dependencies",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.10",
+    "@types/vscode": "^1.90.0",
+    "@vscode/vsce": "^2.32.0",
+    "typescript": "^5.5.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://example.com/local/ini-brain-ai.git"
+  }
+}

@@ -1,0 +1,9 @@
+src/**
+.vscode/**
+.brain/**
+*.map
+tsconfig.json
+
+create-files.cjs
+node_modules/**
+package-lock.json
