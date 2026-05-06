@@ -104,6 +104,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       sidebar.log(`Agent guide generated: ${result.agentsPath}, ${result.compactContextPath}`);
       vscode.window.showInformationMessage('INI Brain AI agent guide generated: AGENTS.md and .brain context files.');
     })),
+    vscode.commands.registerCommand('projectBrain.generateSkillsWorkflow', () => runWithStatus(sidebar, 'Scanning', async () => {
+      const { brain, agentGuide } = requireBrain();
+      const data = await brain.scanIncremental();
+      const result = await agentGuide.generate(data);
+      sidebar.log(`Skills and workflow generated: ${result.skillsIndexPath}, ${result.workflowPath}, ${result.qualityGatesPath}`);
+      vscode.window.showInformationMessage('INI Brain AI generated Skills, Workflow, and Quality Gates.');
+    })),
     vscode.commands.registerCommand('projectBrain.copyContextForCline', () => runWithStatus(sidebar, 'Ready', async () => {
       const { brain, agentGuide } = requireBrain();
       const data = await brain.getBrain();

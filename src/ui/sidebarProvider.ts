@@ -54,6 +54,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       ['Auto Mode', 'projectBrain.autoMode', 'secondary'],
       ['Generate Project', 'projectBrain.generateProject', 'primary'],
       ['Agent Guide', 'projectBrain.generateAgentGuide', 'secondary'],
+      ['Skills & Workflow', 'projectBrain.generateSkillsWorkflow', 'secondary'],
       ['Copy for Cline', 'projectBrain.copyContextForCline', 'secondary'],
       ['Settings', 'projectBrain.openSettings', 'secondary']
     ].map(([label, command, kind]) => `<button class="btn ${kind}" data-command="${command}">${label}</button>`).join('');

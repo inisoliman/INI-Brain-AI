@@ -476,3 +476,60 @@ INI Brain AI is local-first.
 ## License
 
 MIT
+
+## Skills, Workflow, and Quality Gates
+
+Starting with version 1.2.0, INI Brain AI generates an AI-agent operating layer that includes project-specific skills and workflows.
+
+Generated files:
+
+```text
+.brain/workflow.md
+.brain/skills.md
+.brain/skills/*.md
+.brain/quality_gates.md
+```
+
+### Skills
+
+Skills are task-specific playbooks for AI agents.
+
+Examples:
+
+- TypeScript Development
+- VS Code Extension Development
+- VS Code Webview UI
+- Agent Memory and Context Engineering
+- Release and VSIX Packaging
+- React Frontend Development
+- Laravel Development
+- Python Development
+
+INI Brain AI detects relevant skills from the scanned project structure and writes detailed instructions into `.brain/skills/`.
+
+### Workflow
+
+`.brain/workflow.md` defines the required operating procedure for agents:
+
+1. Intake
+2. Skill selection
+3. Planning
+4. Execution
+5. Verification
+6. Memory update
+7. Final response
+
+### Quality Gates
+
+`.brain/quality_gates.md` defines checks that should be applied before final delivery, such as compile/package commands, safety rules, and review checklist items.
+
+### Skills & Workflow button
+
+The sidebar includes **Skills & Workflow** to regenerate:
+
+- `.brain/workflow.md`
+- `.brain/skills.md`
+- `.brain/skills/*.md`
+- `.brain/quality_gates.md`
+
+This helps AI agents work more consistently and reduces repeated explanation across sessions.

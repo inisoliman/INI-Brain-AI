@@ -2,7 +2,7 @@
   "name": "ini-brain-ai",
   "displayName": "INI Brain AI",
   "description": "Autonomous project scanner, local brain knowledge base, and multi-agent AI workflow for VS Code.",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -23,7 +23,8 @@
     "onCommand:projectBrain.autoMode",
     "onCommand:projectBrain.openSettings",
     "onCommand:projectBrain.generateAgentGuide",
-    "onCommand:projectBrain.copyContextForCline"
+    "onCommand:projectBrain.copyContextForCline",
+    "onCommand:projectBrain.generateSkillsWorkflow"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -59,6 +60,10 @@
       {
         "command": "projectBrain.copyContextForCline",
         "title": "INI Brain: Copy Context for Cline"
+      },
+      {
+        "command": "projectBrain.generateSkillsWorkflow",
+        "title": "INI Brain: Generate Skills & Workflow"
       }
     ],
     "viewsContainers": {
