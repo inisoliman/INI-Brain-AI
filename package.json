@@ -2,7 +2,7 @@
   "name": "ini-brain-ai",
   "displayName": "INI Brain AI",
   "description": "Autonomous project scanner, local brain knowledge base, and multi-agent AI workflow for VS Code.",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -24,7 +24,12 @@
     "onCommand:projectBrain.openSettings",
     "onCommand:projectBrain.generateAgentGuide",
     "onCommand:projectBrain.copyContextForCline",
-    "onCommand:projectBrain.generateSkillsWorkflow"
+    "onCommand:projectBrain.generateSkillsWorkflow",
+    "onCommand:projectBrain.saveMemory",
+    "onCommand:projectBrain.searchMemory",
+    "onCommand:projectBrain.showMemoryProfile",
+    "onCommand:projectBrain.copyMcpConfigForCline",
+    "onCommand:projectBrain.installMcpForCline"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -64,6 +69,26 @@
       {
         "command": "projectBrain.generateSkillsWorkflow",
         "title": "INI Brain: Generate Skills & Workflow"
+      },
+      {
+        "command": "projectBrain.saveMemory",
+        "title": "INI Brain: Save Memory"
+      },
+      {
+        "command": "projectBrain.searchMemory",
+        "title": "INI Brain: Search Memory"
+      },
+      {
+        "command": "projectBrain.showMemoryProfile",
+        "title": "INI Brain: Show Memory Profile"
+      },
+      {
+        "command": "projectBrain.copyMcpConfigForCline",
+        "title": "INI Brain: Copy MCP Config for Cline"
+      },
+      {
+        "command": "projectBrain.installMcpForCline",
+        "title": "INI Brain: Install MCP for Cline"
       }
     ],
     "viewsContainers": {
@@ -127,5 +152,8 @@
   "repository": {
     "type": "git",
     "url": "https://example.com/local/ini-brain-ai.git"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0"
   }
 }

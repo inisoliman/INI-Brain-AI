@@ -56,6 +56,11 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       ['Agent Guide', 'projectBrain.generateAgentGuide', 'secondary'],
       ['Skills & Workflow', 'projectBrain.generateSkillsWorkflow', 'secondary'],
       ['Copy for Cline', 'projectBrain.copyContextForCline', 'secondary'],
+      ['Save Memory', 'projectBrain.saveMemory', 'primary'],
+      ['Search Memory', 'projectBrain.searchMemory', 'secondary'],
+      ['Memory Profile', 'projectBrain.showMemoryProfile', 'secondary'],
+      ['Copy MCP Config', 'projectBrain.copyMcpConfigForCline', 'secondary'],
+      ['Install MCP', 'projectBrain.installMcpForCline', 'primary'],
       ['Settings', 'projectBrain.openSettings', 'secondary']
     ].map(([label, command, kind]) => `<button class="btn ${kind}" data-command="${command}">${label}</button>`).join('');
 

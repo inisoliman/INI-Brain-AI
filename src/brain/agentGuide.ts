@@ -67,7 +67,7 @@ export class AgentGuideGenerator {
     };
   }
 
-  async buildClineClipboardText(data: BrainData): Promise<string> {
+  async buildClineClipboardText(data: BrainData, memoryContext = ''): Promise<string> {
     const skills = this.detectSkills(data);
     return [
       '# INI Brain AI Context for Cline',
@@ -94,6 +94,13 @@ export class AgentGuideGenerator {
       '- Prefer small diffs and preserve architecture unless explicitly asked.',
       '- Update .brain/tasks.md for notable pending work.',
       '- Update .brain/decisions.md for durable architecture decisions.',
+      '',
+      'Runtime memory rules:',
+      '- Reuse the INI Brain Memory section below before asking the user to re-explain decisions.',
+      '- If an INI Brain MCP server is available, call its context/search tools before editing and save durable discoveries after finishing.',
+      '- Treat memory as guidance, but verify against current files before changing code.',
+      '',
+      memoryContext ? `## INI Brain Runtime Memory\n${memoryContext}` : '',
       '',
       this.buildCompactContext(data, skills)
     ].join('\n');

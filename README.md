@@ -231,6 +231,82 @@ Generates or refreshes:
 
 Copies compact project context to clipboard so you can paste it into Cline or another AI agent.
 
+### Runtime Memory
+
+INI Brain AI now includes a lightweight local runtime memory inspired by AgentMemory-style workflows.
+
+New commands/buttons:
+
+- **Save Memory**: store a durable fact, decision, preference, bug, workflow note, session note, or general note.
+- **Search Memory**: search saved memories using a local relevance score.
+- **Memory Profile**: show top concepts, top files, important decisions, and recent memories.
+
+Memories are stored locally in:
+
+```text
+.brain/memories.json
+```
+
+When using **Copy for Cline**, INI Brain AI now includes a compact runtime-memory section so Cline can reuse previous decisions and discoveries instead of asking you to re-explain them.
+
+Recommended habit:
+
+1. Save important architecture decisions with **Save Memory**.
+2. Search memory before starting related tasks.
+3. Use **Copy for Cline** so project context and runtime memory are pasted together.
+4. Future MCP integration will allow Cline to call these memory tools directly.
+
+### Local MCP Server for Cline
+
+MCP means **Model Context Protocol**. It is a standard way for AI agents such as Cline to call external tools.
+
+INI Brain AI includes a local MCP server. It does **not** require online hosting, a cloud server, or an external database. Cline runs it locally through Node.js using stdio.
+
+Available MCP tools:
+
+- `ini_brain_status` — show local workspace and memory status.
+- `ini_brain_get_context` — build task-specific context from `.brain` plus runtime memory.
+- `ini_brain_search_memory` — search saved memories.
+- `ini_brain_save_memory` — save durable discoveries from Cline.
+- `ini_brain_project_profile` — return project and memory profile.
+
+Setup flow:
+
+1. Run `npm run compile` or install the packaged VSIX.
+2. Open the INI Brain AI sidebar.
+3. Click **Install MCP** to automatically add/update the local INI Brain MCP server in Cline settings.
+4. Reload Cline MCP servers or run **Developer: Reload Window**.
+
+Manual fallback:
+
+- Click **Copy MCP Config**.
+- Paste/merge the copied JSON into Cline MCP settings.
+- Restart/reload Cline MCP servers.
+
+The generated config looks like this:
+
+```json
+{
+  "mcpServers": {
+    "ini-brain-ai": {
+      "command": "node",
+      "args": [".../dist/mcp/iniBrainMcp.js"],
+      "env": {
+        "INI_BRAIN_WORKSPACE": ".../your-project"
+      },
+      "disabled": false,
+      "autoApprove": []
+    }
+  }
+}
+```
+
+Recommended Cline instruction after enabling MCP:
+
+```md
+Before editing, call ini_brain_get_context for my task. During work, use ini_brain_search_memory when a previous decision may matter. After finishing, call ini_brain_save_memory for durable decisions, bugs, or workflow discoveries.
+```
+
 ### Settings
 
 Opens the settings panel for:
