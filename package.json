@@ -2,7 +2,7 @@
   "name": "ini-brain-ai",
   "displayName": "INI Brain AI",
   "description": "Autonomous project scanner, local brain knowledge base, and multi-agent AI workflow for VS Code.",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "publisher": "local",
   "license": "MIT",
   "engines": {

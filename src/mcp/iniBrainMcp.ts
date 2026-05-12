@@ -94,6 +94,7 @@ const TOOLS = [
 class IniBrainMcpServer {
   private readonly memory = new MemoryStore(WORKSPACE);
   private inputBuffer = Buffer.alloc(0);
+  private transportMode: 'headers' | 'lines' = 'lines';
 
   constructor() {
     process.on('SIGINT', async () => {
@@ -121,10 +122,17 @@ class IniBrainMcpServer {
   }
 
   private readNextMessage(): JsonRpcRequest | null {
+    const trimmedStart = this.inputBuffer.toString('utf8', 0, Math.min(this.inputBuffer.length, 32)).trimStart();
+    if (trimmedStart.startsWith('{')) {
+      return this.readNextLineMessage();
+    }
+
     const separator = this.inputBuffer.indexOf('\r\n\r\n');
     if (separator === -1) {
       return null;
     }
+
+    this.transportMode = 'headers';
 
     const header = this.inputBuffer.subarray(0, separator).toString('utf8');
     const match = /^Content-Length:\s*(\d+)$/im.exec(header);
@@ -146,6 +154,26 @@ class IniBrainMcpServer {
       return JSON.parse(body) as JsonRpcRequest;
     } catch (error) {
       throw new McpError(ErrorCode.ParseError, `Invalid JSON: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+
+  private readNextLineMessage(): JsonRpcRequest | null {
+    const newline = this.inputBuffer.indexOf('\n');
+    if (newline === -1) {
+      return null;
+    }
+
+    this.transportMode = 'lines';
+    const line = this.inputBuffer.subarray(0, newline).toString('utf8').trim();
+    this.inputBuffer = this.inputBuffer.subarray(newline + 1);
+    if (!line) {
+      return this.readNextMessage();
+    }
+
+    try {
+      return JSON.parse(line) as JsonRpcRequest;
+    } catch (error) {
+      throw new McpError(ErrorCode.ParseError, `Invalid JSON line: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -180,7 +208,7 @@ class IniBrainMcpServer {
         return {
           protocolVersion: '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'ini-brain-ai', version: '1.3.1' }
+          serverInfo: { name: 'ini-brain-ai', version: '1.4.1' }
         };
       case 'tools/list':
         return { tools: TOOLS };
@@ -209,6 +237,10 @@ class IniBrainMcpServer {
 
   private writeResponse(response: JsonRpcResponse): void {
     const body = Buffer.from(JSON.stringify(response), 'utf8');
+    if (this.transportMode === 'lines') {
+      process.stdout.write(`${body.toString('utf8')}\n`);
+      return;
+    }
     process.stdout.write(`Content-Length: ${body.length}\r\n\r\n`);
     process.stdout.write(body);
   }
