@@ -2,7 +2,7 @@
   "name": "ini-brain-ai",
   "displayName": "INI Brain AI",
   "description": "Autonomous project scanner, local brain knowledge base, and multi-agent AI workflow for VS Code.",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -29,7 +29,8 @@
     "onCommand:projectBrain.searchMemory",
     "onCommand:projectBrain.showMemoryProfile",
     "onCommand:projectBrain.copyMcpConfigForCline",
-    "onCommand:projectBrain.installMcpForCline"
+    "onCommand:projectBrain.installMcpForCline",
+    "onCommand:projectBrain.copyChatTaskForCline"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -89,6 +90,10 @@
       {
         "command": "projectBrain.installMcpForCline",
         "title": "INI Brain: Install MCP for Cline"
+      },
+      {
+        "command": "projectBrain.copyChatTaskForCline",
+        "title": "INI Brain: Copy Chat Task for Cline"
       }
     ],
     "viewsContainers": {
@@ -152,8 +157,5 @@
   "repository": {
     "type": "git",
     "url": "https://example.com/local/ini-brain-ai.git"
-  },
-  "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0"
   }
 }

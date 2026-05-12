@@ -11,6 +11,9 @@ export interface AgentGuideResult {
   workflowPath: string;
   skillsIndexPath: string;
   qualityGatesPath: string;
+  clineWorkflowPath: string;
+  clineRulesSkillsDir: string;
+  clineSkillsDir: string;
   generatedSkills: string[];
 }
 
@@ -29,8 +32,14 @@ export class AgentGuideGenerator {
   async generate(data: BrainData): Promise<AgentGuideResult> {
     const brainDir = path.join(this.root, '.brain');
     const skillsDir = path.join(brainDir, 'skills');
+    const clineWorkflowsDir = path.join(this.root, '.clinerules', 'workflows');
+    const clineRulesSkillsDir = path.join(this.root, '.clinerules', 'skills');
+    const clineSkillsDir = path.join(this.root, '.cline', 'skills');
     await fs.mkdir(brainDir, { recursive: true });
     await fs.mkdir(skillsDir, { recursive: true });
+    await fs.mkdir(clineWorkflowsDir, { recursive: true });
+    await fs.mkdir(clineRulesSkillsDir, { recursive: true });
+    await fs.mkdir(clineSkillsDir, { recursive: true });
 
     const skills = this.detectSkills(data);
     const agentsPath = path.join(this.root, 'AGENTS.md');
@@ -41,6 +50,7 @@ export class AgentGuideGenerator {
     const workflowPath = path.join(brainDir, 'workflow.md');
     const skillsIndexPath = path.join(brainDir, 'skills.md');
     const qualityGatesPath = path.join(brainDir, 'quality_gates.md');
+    const clineWorkflowPath = path.join(clineWorkflowsDir, 'ini-brain-project-workflow.md');
 
     await Promise.all([
       this.writeAgentsFile(agentsPath, data, skills),
@@ -50,6 +60,9 @@ export class AgentGuideGenerator {
       fs.writeFile(skillsIndexPath, this.buildSkillsIndex(skills), 'utf8'),
       fs.writeFile(qualityGatesPath, this.buildQualityGates(data, skills), 'utf8'),
       this.writeSkillFiles(skillsDir, skills),
+      fs.writeFile(clineWorkflowPath, this.buildClineWorkflow(data, skills), 'utf8'),
+      this.writeClineSkillFiles(clineRulesSkillsDir, skills),
+      this.writeClineSkillFiles(clineSkillsDir, skills),
       this.writeIfMissing(decisionsPath, this.initialDecisions(data)),
       this.writeIfMissing(tasksPath, this.initialTasks(data))
     ]);
@@ -63,6 +76,9 @@ export class AgentGuideGenerator {
       workflowPath: '.brain/workflow.md',
       skillsIndexPath: '.brain/skills.md',
       qualityGatesPath: '.brain/quality_gates.md',
+      clineWorkflowPath: '.clinerules/workflows/ini-brain-project-workflow.md',
+      clineRulesSkillsDir: '.clinerules/skills',
+      clineSkillsDir: '.cline/skills',
       generatedSkills: skills.map(skill => `.brain/skills/${skill.id}.md`)
     };
   }
@@ -289,6 +305,25 @@ export class AgentGuideGenerator {
     ].join('\n');
   }
 
+  private buildClineWorkflow(data: BrainData, skills: SkillDefinition[]): string {
+    return [
+      '# INI Brain Project Workflow',
+      '',
+      'Use this workflow when working in this workspace with Cline.',
+      '',
+      '## Trigger',
+      'Use for any code, documentation, packaging, or project-memory task in this repository.',
+      '',
+      '## Required context',
+      '- Read `AGENTS.md` first.',
+      '- Read `.brain/compact_context.md` for the compact architecture summary.',
+      '- Read `.brain/tasks.md` and `.brain/decisions.md` when the task may depend on prior work.',
+      '',
+      '## Steps',
+      this.buildWorkflow(data, skills)
+    ].join('\n');
+  }
+
   private buildSkillsIndex(skills: SkillDefinition[]): string {
     return [
       '# Project Skills Index',
@@ -314,6 +349,21 @@ export class AgentGuideGenerator {
 
   private async writeSkillFiles(skillsDir: string, skills: SkillDefinition[]): Promise<void> {
     await Promise.all(skills.map(skill => fs.writeFile(path.join(skillsDir, `${skill.id}.md`), this.formatSkill(skill), 'utf8')));
+  }
+
+  private async writeClineSkillFiles(skillsDir: string, skills: SkillDefinition[]): Promise<void> {
+    await Promise.all(skills.map(skill => fs.writeFile(path.join(skillsDir, `${skill.id}.md`), this.formatClineSkill(skill), 'utf8')));
+  }
+
+  private formatClineSkill(skill: SkillDefinition): string {
+    return [
+      '---',
+      `name: ${skill.id}`,
+      `description: ${skill.title}. Use when ${skill.whenToUse.join(' ')}`,
+      '---',
+      '',
+      this.formatSkill(skill)
+    ].join('\n');
   }
 
   private formatSkill(skill: SkillDefinition): string {

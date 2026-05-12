@@ -63,10 +63,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const stats = brain.getScanStats();
       sidebar.log(`Rebuilt brain: ${data.projectMap.totalFiles} files. Skipped large: ${stats.skippedLargeFiles}. Agent guide updated.`);
     })),
-    vscode.commands.registerCommand('projectBrain.askAI', () => runWithStatus(sidebar, 'AI Working', async () => {
+    vscode.commands.registerCommand('projectBrain.askAI', (chatRequest?: string) => runWithStatus(sidebar, 'AI Working', async () => {
       const { orchestrator } = requireBrain();
-      const request = await vscode.window.showInputBox({ prompt: 'What do you want to ask INI Brain AI?' });
+      const request = chatRequest || await vscode.window.showInputBox({ prompt: 'What do you want to ask INI Brain AI?' });
       if (!request) return;
+      sidebar.addChatMessage('user', request);
       sidebar.log('Sending question to AI...');
       output.clear();
       output.appendLine('# INI Brain AI');
@@ -81,8 +82,25 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       output.appendLine(`Selected files: ${answer.contextSummary.selectedFiles.length}`);
       output.appendLine(`Context size: ${answer.contextSummary.totalBytes} bytes`);
       output.show(true);
+      sidebar.addChatMessage('assistant', summarizeForSidebar(answer.finalText));
       sidebar.log('AI answer generated. Check the Output panel: INI Brain AI.');
       vscode.window.showInformationMessage('INI Brain AI answer is ready in the Output panel.');
+    })),
+    vscode.commands.registerCommand('projectBrain.copyChatTaskForCline', (chatRequest?: string) => runWithStatus(sidebar, 'Ready', async () => {
+      const { brain, agentGuide, memory } = requireBrain();
+      if (!chatRequest || !chatRequest.trim()) {
+        vscode.window.showWarningMessage('Write your idea in Ask AI Chat first.');
+        return;
+      }
+      sidebar.addChatMessage('user', chatRequest);
+      const data = await brain.getBrain();
+      const memoryContext = await memory.buildContext(chatRequest, 4500);
+      const projectContext = await agentGuide.buildClineClipboardText(data, memoryContext);
+      const task = buildClineTask(chatRequest, projectContext);
+      await vscode.env.clipboard.writeText(task);
+      sidebar.addChatMessage('system', 'Task copied for Cline. افتح Cline والصق النص ليبدأ التنفيذ بناءً على سياق المشروع.');
+      sidebar.log('Ask AI chat task copied for Cline.');
+      vscode.window.showInformationMessage('Task copied for Cline. Paste it into Cline to execute.');
     })),
     vscode.commands.registerCommand('projectBrain.autoMode', () => runWithStatus(sidebar, 'AI Working', async () => {
       const { orchestrator } = requireBrain();
@@ -197,6 +215,24 @@ async function generateProject(root: string, orchestrator: AiOrchestrator, sideb
   output.appendLine(answer);
   output.show(true);
   sidebar.log('Project generation attempted.');
+}
+
+function summarizeForSidebar(text: string): string {
+  const compact = text.replace(/\r/g, '').split('\n').filter(line => line.trim()).slice(0, 12).join('\n');
+  return compact.length > 1200 ? `${compact.slice(0, 1200)}...\n\nFull answer is available in the Output panel.` : `${compact}\n\nFull answer is available in the Output panel.`;
+}
+
+function buildClineTask(request: string, projectContext: string): string {
+  return [
+    '<task>',
+    request.trim(),
+    '</task>',
+    '',
+    '## INI Brain AI Context',
+    'Use this project context, then implement the task in Cline. Follow the repository AGENTS.md rules, inspect relevant files before editing, make minimal compatible changes, and run the relevant verification commands.',
+    '',
+    projectContext
+  ].join('\n');
 }
 
 async function saveMemory(memory: MemoryStore, sidebar: SidebarProvider): Promise<void> {
@@ -354,6 +390,7 @@ function logError(sidebar: SidebarProvider, e: unknown): void {
 }
 
 export function deactivate(): void {}
+
 
 
 
