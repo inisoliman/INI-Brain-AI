@@ -1,8 +1,9 @@
 {
   "name": "ini-brain-ai",
   "displayName": "INI Brain AI",
-  "description": "Autonomous project scanner, local brain knowledge base, and multi-agent AI workflow for VS Code.",
-  "version": "1.4.1",
+  "description": "Autonomous project scanner, local brain knowledge base, multi-agent AI workflow, code insights (onboarding/explain/impact) and quality guards for VS Code.",
+  "version": "2.0.0",
+
   "publisher": "local",
   "license": "MIT",
   "engines": {
@@ -30,8 +31,14 @@
     "onCommand:projectBrain.showMemoryProfile",
     "onCommand:projectBrain.copyMcpConfigForCline",
     "onCommand:projectBrain.installMcpForCline",
-    "onCommand:projectBrain.copyChatTaskForCline"
+    "onCommand:projectBrain.copyChatTaskForCline",
+    "onCommand:projectBrain.generateOnboarding",
+    "onCommand:projectBrain.explainFile",
+    "onCommand:projectBrain.analyzeImpact",
+    "onCommand:projectBrain.generateGuards",
+    "onCommand:projectBrain.restoreBackup"
   ],
+
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
@@ -94,8 +101,29 @@
       {
         "command": "projectBrain.copyChatTaskForCline",
         "title": "INI Brain: Copy Chat Task for Cline"
+      },
+      {
+        "command": "projectBrain.generateOnboarding",
+        "title": "INI Brain: Generate Onboarding Guide"
+      },
+      {
+        "command": "projectBrain.explainFile",
+        "title": "INI Brain: Explain Current File"
+      },
+      {
+        "command": "projectBrain.analyzeImpact",
+        "title": "INI Brain: Analyze Change Impact"
+      },
+      {
+        "command": "projectBrain.generateGuards",
+        "title": "INI Brain: Generate Quality Guards"
+      },
+      {
+        "command": "projectBrain.restoreBackup",
+        "title": "INI Brain: Restore Auto Mode Backup"
       }
     ],
+
     "viewsContainers": {
       "activitybar": [
         {
@@ -138,8 +166,28 @@
           "type": "boolean",
           "default": true,
           "description": "Show a prompt to scan and generate an AI agent guide when opening an uninitialized workspace."
+        },
+        "projectBrain.requestTimeoutMs": {
+          "type": "number",
+          "default": 120000,
+          "minimum": 5000,
+          "maximum": 600000,
+          "description": "Timeout (ms) for each AI request before it is aborted."
+        },
+        "projectBrain.autoModeConfirmEachChange": {
+          "type": "boolean",
+          "default": true,
+          "description": "In Auto Mode, preview the change list and require confirmation before writing files."
+        },
+        "projectBrain.backupRetention": {
+          "type": "number",
+          "default": 50,
+          "minimum": 0,
+          "maximum": 1000,
+          "description": "How many Auto Mode backups to keep in .brain/backups (older ones are pruned). 0 disables pruning."
         }
       }
+
     }
   },
   "scripts": {

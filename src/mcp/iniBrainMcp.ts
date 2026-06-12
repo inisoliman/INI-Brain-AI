@@ -2,8 +2,22 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { MemoryKind, MemoryStore, parseCsvList } from '../memory/memoryStore';
+import { InsightBuilder } from '../brain/insightBuilder';
+import { BrainData, DependencyGraph, FileRecord, ProjectMap } from '../types';
 
 const WORKSPACE = process.env.INI_BRAIN_WORKSPACE || process.cwd();
+
+function readServerVersion(): string {
+  try {
+    const pkg = JSON.parse(require('fs').readFileSync(path.join(__dirname, '..', '..', 'package.json'), 'utf8'));
+    return typeof pkg.version === 'string' ? pkg.version : '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+const SERVER_VERSION = readServerVersion();
+
 
 const JSON_RPC_VERSION = '2.0';
 
@@ -88,8 +102,46 @@ const TOOLS = [
       },
       required: ['task']
     }
+  },
+  {
+    name: 'ini_brain_onboarding',
+    description: 'Generate a project onboarding guide (start-here files, entry points, complexity hotspots, file map) from the brain index. No LLM needed.',
+    inputSchema: { type: 'object', properties: {} }
+  },
+  {
+    name: 'ini_brain_explain',
+    description: 'Explain a single file: its exports, what it depends on, who depends on it, and a source preview. Pass a project-relative path.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Project-relative file path (forward slashes).' }
+      },
+      required: ['path']
+    }
+  },
+  {
+    name: 'ini_brain_impact',
+    description: 'Analyze the ripple effect (blast radius) of changing a list of files using the dependency graph.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        files: { type: 'array', items: { type: 'string' }, description: 'Project-relative paths of changed files.' }
+      },
+      required: ['files']
+    }
+  },
+  {
+    name: 'ini_brain_list_memories',
+    description: 'List the most recent durable project memories saved in INI Brain.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        limit: { type: 'number', minimum: 1, maximum: 50 }
+      }
+    }
   }
 ] as const;
+
 
 class IniBrainMcpServer {
   private readonly memory = new MemoryStore(WORKSPACE);
@@ -208,8 +260,9 @@ class IniBrainMcpServer {
         return {
           protocolVersion: '2024-11-05',
           capabilities: { tools: {} },
-          serverInfo: { name: 'ini-brain-ai', version: '1.4.1' }
+          serverInfo: { name: 'ini-brain-ai', version: SERVER_VERSION }
         };
+
       case 'tools/list':
         return { tools: TOOLS };
       case 'tools/call': {
@@ -226,6 +279,14 @@ class IniBrainMcpServer {
             return text(await this.projectProfile(), true);
           case 'ini_brain_get_context':
             return text(await this.getContext(args), false);
+          case 'ini_brain_onboarding':
+            return text(await this.onboarding(), false);
+          case 'ini_brain_explain':
+            return text(await this.explain(args), false);
+          case 'ini_brain_impact':
+            return text(await this.impact(args), false);
+          case 'ini_brain_list_memories':
+            return text(await this.listMemories(args), true);
           default:
             throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
         }
@@ -326,7 +387,55 @@ class IniBrainMcpServer {
 
     return combined.length <= budgetChars ? combined : `${combined.slice(0, budgetChars)}\n<!-- ini brain context truncated -->`;
   }
+
+  private async onboarding(): Promise<string> {
+    const brain = await loadBrain();
+    if (!brain) return 'No brain index found. Run "INI Brain: Scan Project" first.';
+    return new InsightBuilder().buildOnboarding(brain);
+  }
+
+  private async explain(args: ToolArgs): Promise<string> {
+    if (typeof args.path !== 'string' || !args.path.trim()) {
+      throw new McpError(ErrorCode.InvalidParams, 'path is required');
+    }
+    const brain = await loadBrain();
+    if (!brain) return 'No brain index found. Run "INI Brain: Scan Project" first.';
+    const rel = args.path.trim().replace(/\\/g, '/').replace(/^\.\//, '');
+    return new InsightBuilder().buildExplain(brain, rel).markdown;
+  }
+
+  private async impact(args: ToolArgs): Promise<string> {
+    const files = Array.isArray(args.files) ? args.files.map(String) : [];
+    if (files.length === 0) {
+      throw new McpError(ErrorCode.InvalidParams, 'files must be a non-empty array of project-relative paths');
+    }
+    const brain = await loadBrain();
+    if (!brain) return 'No brain index found. Run "INI Brain: Scan Project" first.';
+    return new InsightBuilder().buildImpact(brain, files).markdown;
+  }
+
+  private async listMemories(args: ToolArgs): Promise<Record<string, unknown>> {
+    const limit = typeof args.limit === 'number' ? Math.max(1, Math.min(50, Math.floor(args.limit))) : 20;
+    const memories = await this.memory.list(limit);
+    return { total: memories.length, memories };
+  }
 }
+
+async function loadBrain(): Promise<BrainData | null> {
+  const brainDir = path.join(WORKSPACE, '.brain');
+  const projectMap = await readJson(path.join(brainDir, 'project_map.json'), null) as ProjectMap | null;
+  const fileIndex = await readJson(path.join(brainDir, 'file_index.json'), null) as Record<string, FileRecord> | null;
+  if (!projectMap || !fileIndex) return null;
+  const dependencies = await readJson(path.join(brainDir, 'dependencies.json'), {
+    generatedAt: new Date(0).toISOString(),
+    edges: {},
+    unresolved: {}
+  }) as DependencyGraph;
+  const architecture = await readText(path.join(brainDir, 'architecture.md'), '');
+  const aiContext = await readText(path.join(brainDir, 'ai_context.md'), '');
+  return { projectMap, fileIndex, dependencies, architecture, aiContext };
+}
+
 
 function text(payload: unknown, pretty: boolean): { content: Array<{ type: 'text'; text: string }> } {
   return { content: [{ type: 'text', text: typeof payload === 'string' ? payload : JSON.stringify(payload, null, pretty ? 2 : 0) }] };

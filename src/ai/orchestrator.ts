@@ -38,6 +38,29 @@ export class AiOrchestrator {
     return { request, contextSummary: { selectedFiles: built.selectedFiles, totalBytes: built.totalBytes }, transcript: { planner, executor, reviewer }, finalText };
   }
 
+  /**
+   * Returns the proposed change set without applying anything, so the UI can
+   * present a preview/confirmation (H2) before any file is written.
+   */
+  async planAutoMode(request: string): Promise<{ result: AiRunResult; changes: CodeChange[] }> {
+    const result = await this.run(request);
+    const changes = this.extractChanges(result.finalText);
+    return { result, changes };
+  }
+
+  /** Apply an already-reviewed change set and return a human-readable report. */
+  async applyAutoModeChanges(result: AiRunResult, changes: CodeChange[]): Promise<string> {
+    const applied: AppliedChange[] = [];
+    for (const change of changes) {
+      applied.push(await this.applyChange(change));
+    }
+    if (applied.length) {
+      await this.pruneBackups();
+      await this.brain.scanIncremental();
+    }
+    return this.formatAutoModeReport(result, applied);
+  }
+
   async autoMode(request: string): Promise<string> {
     const result = await this.run(request);
     const changes = this.extractChanges(result.finalText);
@@ -47,7 +70,15 @@ export class AiOrchestrator {
       applied.push(await this.applyChange(change));
     }
 
-    if (applied.length) await this.brain.scanIncremental();
+    if (applied.length) {
+      await this.pruneBackups();
+      await this.brain.scanIncremental();
+    }
+    return this.formatAutoModeReport(result, applied);
+  }
+
+  private formatAutoModeReport(result: AiRunResult, applied: AppliedChange[]): string {
+
 
     return [
       result.finalText,
@@ -99,7 +130,21 @@ export class AiOrchestrator {
     }
   }
 
+  /** M6 fix: keep only the newest N Auto Mode backups in .brain/backups. */
+  private async pruneBackups(): Promise<void> {
+    const retention = vscode.workspace.getConfiguration('projectBrain').get<number>('backupRetention', 50);
+    if (!retention || retention <= 0) return;
+    const dir = path.join(this.root, '.brain', 'backups');
+    let entries: string[] = [];
+    try { entries = await fs.readdir(dir); } catch { return; }
+    if (entries.length <= retention) return;
+    // Names are prefixed with Date.now(); lexicographic sort ~= chronological.
+    const toDelete = entries.sort().slice(0, entries.length - retention);
+    await Promise.all(toDelete.map(name => fs.rm(path.join(dir, name), { force: true }).catch(() => undefined)));
+  }
+
   private extractChanges(text: string): CodeChange[] {
+
     const blocks = [...text.matchAll(/```json\s*([\s\S]*?)```/gi)];
     for (const match of blocks) {
       try {

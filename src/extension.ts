@@ -9,7 +9,9 @@ import { SettingsService } from './storage/settingsService';
 import { SettingsPanel } from './ui/settingsPanel';
 import { SidebarProvider } from './ui/sidebarProvider';
 import { AgentGuideGenerator } from './brain/agentGuide';
+import { InsightBuilder } from './brain/insightBuilder';
 import { MemoryKind, MemoryStore, formatMemoryLine, parseCsvList } from './memory/memoryStore';
+
 
 let output: vscode.OutputChannel;
 
@@ -106,6 +108,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const { orchestrator } = requireBrain();
       const request = await vscode.window.showInputBox({ prompt: 'Describe the change. Auto Mode may modify files.' });
       if (!request) return;
+
+      const confirmEach = vscode.workspace.getConfiguration('projectBrain').get<boolean>('autoModeConfirmEachChange', true);
+      if (confirmEach) {
+        // H2: plan first, preview the change list, then require confirmation.
+        sidebar.log('Auto Mode: planning changes...');
+        const { result, changes } = await orchestrator.planAutoMode(request);
+        output.clear();
+        output.appendLine(result.finalText);
+        if (changes.length) {
+          output.appendLine('\n# Proposed Changes (not yet applied)');
+          for (const c of changes) output.appendLine(`- ${c.action}: ${c.path}`);
+        } else {
+          output.appendLine('\nNo machine-readable changes block found.');
+        }
+        output.show(true);
+        if (changes.length === 0) { sidebar.log('Auto Mode: nothing to apply.'); return; }
+        const ok = await vscode.window.showWarningMessage(
+          `Auto Mode will apply ${changes.length} file change(s). Review them in the Output panel, then apply?`,
+          { modal: true }, 'Apply Changes'
+        );
+        if (ok !== 'Apply Changes') { sidebar.log('Auto Mode cancelled before applying.'); return; }
+        const answer = await orchestrator.applyAutoModeChanges(result, changes);
+        output.clear();
+        output.appendLine(answer);
+        output.show(true);
+        sidebar.log('Auto Mode applied changes.');
+        return;
+      }
+
       const ok = await vscode.window.showWarningMessage('Auto Mode will apply AI-generated file changes. Continue?', { modal: true }, 'Continue');
       if (ok !== 'Continue') return;
       const answer = await orchestrator.autoMode(request);
@@ -113,6 +144,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       output.appendLine(answer);
       output.show(true);
       sidebar.log('Auto Mode completed.');
+
     })),
     vscode.commands.registerCommand('projectBrain.generateProject', () => runWithStatus(sidebar, 'AI Working', async () => {
       const ctx = requireBrain();
@@ -161,8 +193,56 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const { root } = requireBrain();
       await installMcpForCline(root, sidebar);
     })),
+    vscode.commands.registerCommand('projectBrain.generateOnboarding', () => runWithStatus(sidebar, 'Scanning', async () => {
+      const { brain, root } = requireBrain();
+      const data = await brain.getBrain();
+      const md = new InsightBuilder().buildOnboarding(data);
+      const outPath = path.join(root, '.brain', 'onboarding.md');
+      await fs.mkdir(path.dirname(outPath), { recursive: true });
+      await fs.writeFile(outPath, md, 'utf8');
+      output.clear();
+      output.appendLine(md);
+      output.show(true);
+      sidebar.log('Onboarding guide generated: .brain/onboarding.md');
+      vscode.window.showInformationMessage('INI Brain AI onboarding guide generated: .brain/onboarding.md');
+    })),
+    vscode.commands.registerCommand('projectBrain.explainFile', () => runWithStatus(sidebar, 'Ready', async () => {
+      const { brain, root } = requireBrain();
+      const editor = vscode.window.activeTextEditor;
+      if (!editor) { vscode.window.showWarningMessage('Open a file in the editor first.'); return; }
+      const rel = path.relative(root, editor.document.uri.fsPath).split(path.sep).join('/');
+      const data = await brain.getBrain();
+      const result = new InsightBuilder().buildExplain(data, rel);
+      output.clear();
+      output.appendLine(result.markdown);
+      output.show(true);
+      sidebar.log(`Explained file: ${rel}${result.found ? '' : ' (not indexed)'}`);
+    })),
+    vscode.commands.registerCommand('projectBrain.analyzeImpact', () => runWithStatus(sidebar, 'Ready', async () => {
+      const { brain, root } = requireBrain();
+      const changed = await getGitChangedFiles(root);
+      if (changed.length === 0) { vscode.window.showInformationMessage('No changed files detected via git.'); return; }
+      const data = await brain.getBrain();
+      const result = new InsightBuilder().buildImpact(data, changed);
+      output.clear();
+      output.appendLine(result.markdown);
+      output.show(true);
+      sidebar.log(`Impact analysis: ${result.changedFiles.length} changed, ${result.affectedFiles.length} affected, risk=${result.risk}.`);
+    })),
+    vscode.commands.registerCommand('projectBrain.generateGuards', () => runWithStatus(sidebar, 'Scanning', async () => {
+      const { brain, agentGuide } = requireBrain();
+      const data = await brain.scanIncremental();
+      const result = await agentGuide.generate(data);
+      sidebar.log(`Quality guards generated in skills dirs and ${result.qualityGatesPath}.`);
+      vscode.window.showInformationMessage('INI Brain AI generated quality guards (clean-code, test, karpathy).');
+    })),
+    vscode.commands.registerCommand('projectBrain.restoreBackup', () => runWithStatus(sidebar, 'Ready', async () => {
+      const { root } = requireBrain();
+      await restoreBackup(root, sidebar);
+    })),
     vscode.commands.registerCommand('projectBrain.openSettings', () => SettingsPanel.show(context, settings))
   );
+
 
   sidebar.log('INI Brain AI activated.');
   if (root && brain && agentGuide) void maybePromptProjectInitialization(root, brain, agentGuide, sidebar);
@@ -322,18 +402,27 @@ async function copyMcpConfigForCline(root: string, sidebar: SidebarProvider): Pr
   vscode.window.showInformationMessage('INI Brain MCP config copied. Add it to Cline MCP settings after running npm run compile/package.');
 }
 
+function getClineMcpSettingsPath(): string {
+  // H5 fix: resolve the Cline MCP settings path per OS instead of Windows-only.
+  const tail = ['globalStorage', 'saoudrizwan.claude-dev', 'settings', 'cline_mcp_settings.json'];
+  const home = process.env.USERPROFILE || process.env.HOME || '';
+  if (process.platform === 'win32') {
+    const base = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+    return path.join(base, 'Code', 'User', ...tail);
+  }
+  if (process.platform === 'darwin') {
+    return path.join(home, 'Library', 'Application Support', 'Code', 'User', ...tail);
+  }
+  // linux and others
+  const base = process.env.XDG_CONFIG_HOME || path.join(home, '.config');
+  return path.join(base, 'Code', 'User', ...tail);
+}
+
 async function installMcpForCline(root: string, sidebar: SidebarProvider): Promise<void> {
-  const mcpSettingsPath = path.join(
-    process.env.APPDATA || path.join(process.env.USERPROFILE || '', 'AppData', 'Roaming'),
-    'Code',
-    'User',
-    'globalStorage',
-    'saoudrizwan.claude-dev',
-    'settings',
-    'cline_mcp_settings.json'
-  );
+  const mcpSettingsPath = getClineMcpSettingsPath();
 
   const ok = await vscode.window.showWarningMessage(
+
     `Install/update INI Brain MCP in Cline settings?\n\n${mcpSettingsPath}`,
     { modal: true },
     'Install'
@@ -370,6 +459,55 @@ function buildMcpServerConfig(root: string): Record<string, unknown> {
 async function readJsonFile<T>(file: string, fallback: T): Promise<T> {
   try { return JSON.parse(await fs.readFile(file, 'utf8')) as T; } catch { return fallback; }
 }
+
+async function getGitChangedFiles(root: string): Promise<string[]> {
+  const { exec } = await import('child_process');
+  return new Promise<string[]>(resolve => {
+    exec('git status --porcelain', { cwd: root, windowsHide: true }, (err, stdout) => {
+      if (err) { resolve([]); return; }
+      const files = stdout
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean)
+        // porcelain format: "XY path" (rename uses "old -> new")
+        .map(line => line.replace(/^.{2,3}\s+/, '').split(' -> ').pop()!.trim())
+        .filter(Boolean);
+      resolve([...new Set(files)]);
+    });
+  });
+}
+
+async function restoreBackup(root: string, sidebar: SidebarProvider): Promise<void> {
+  const backupsDir = path.join(root, '.brain', 'backups');
+  let entries: string[] = [];
+  try { entries = await fs.readdir(backupsDir); } catch { entries = []; }
+  if (entries.length === 0) {
+    vscode.window.showInformationMessage('No Auto Mode backups found in .brain/backups.');
+    return;
+  }
+  // Newest first (backup names are prefixed with Date.now()).
+  entries.sort().reverse();
+  const pick = await vscode.window.showQuickPick(entries, { placeHolder: 'Select a backup to restore (original path is encoded in the name)' });
+  if (!pick) return;
+
+  // Decode the original relative path: "<ts>-<rel with __ as separators>".
+  const withoutTs = pick.replace(/^\d+-/, '');
+  const relPath = withoutTs.split('__').join('/');
+  const target = path.join(root, relPath);
+
+  const ok = await vscode.window.showWarningMessage(
+    `Restore backup to ${relPath}? This overwrites the current file.`,
+    { modal: true },
+    'Restore'
+  );
+  if (ok !== 'Restore') return;
+
+  await fs.mkdir(path.dirname(target), { recursive: true });
+  await fs.copyFile(path.join(backupsDir, pick), target);
+  sidebar.log(`Restored backup ${pick} → ${relPath}`);
+  vscode.window.showInformationMessage(`Restored ${relPath} from backup.`);
+}
+
 
 async function runWithStatus(sidebar: SidebarProvider, status: 'Ready' | 'Scanning' | 'AI Working', fn: () => Promise<void>): Promise<void> {
   try {

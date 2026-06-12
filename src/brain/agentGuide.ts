@@ -1,6 +1,8 @@
 ﻿import * as fs from 'fs/promises';
 import * as path from 'path';
 import { BrainData, FileRecord } from '../types';
+import { GUARD_SKILLS, buildGuardsQualitySection, renderGuardSkillFile } from './guardSkills';
+
 
 export interface AgentGuideResult {
   agentsPath: string;
@@ -63,6 +65,11 @@ export class AgentGuideGenerator {
       fs.writeFile(clineWorkflowPath, this.buildClineWorkflow(data, skills), 'utf8'),
       this.writeClineSkillFiles(clineRulesSkillsDir, skills),
       this.writeClineSkillFiles(clineSkillsDir, skills),
+      // Always-on guard skills (clean-code/test/karpathy) in every skills dir.
+      this.writeGuardSkillFiles(skillsDir),
+      this.writeGuardSkillFiles(clineRulesSkillsDir),
+      this.writeGuardSkillFiles(clineSkillsDir),
+
       this.writeIfMissing(decisionsPath, this.initialDecisions(data)),
       this.writeIfMissing(tasksPath, this.initialTasks(data))
     ]);
@@ -355,6 +362,11 @@ export class AgentGuideGenerator {
     await Promise.all(skills.map(skill => fs.writeFile(path.join(skillsDir, `${skill.id}.md`), this.formatClineSkill(skill), 'utf8')));
   }
 
+  private async writeGuardSkillFiles(skillsDir: string): Promise<void> {
+    await Promise.all(GUARD_SKILLS.map(skill => fs.writeFile(path.join(skillsDir, `${skill.id}.md`), renderGuardSkillFile(skill), 'utf8')));
+  }
+
+
   private formatClineSkill(skill: SkillDefinition): string {
     return [
       '---',
@@ -405,9 +417,12 @@ export class AgentGuideGenerator {
       '- Are impacted files listed in the final response?',
       '- Were relevant skills used?',
       '- Were compile/build/test commands run when appropriate?',
-      '- Are remaining risks or follow-ups documented?'
+      '- Are remaining risks or follow-ups documented?',
+      '',
+      buildGuardsQualitySection()
     ].join('\n');
   }
+
 
   private initialDecisions(data: BrainData): string {
     return [

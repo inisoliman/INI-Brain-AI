@@ -129,7 +129,7 @@ Safety rules:
 Download or build the `.vsix` file, for example:
 
 ```text
-ini-brain-ai-1.1.0.vsix
+ini-brain-ai-1.3.0.vsix
 ```
 
 Install it in VS Code:
@@ -138,13 +138,13 @@ Install it in VS Code:
 2. Go to Extensions.
 3. Click the three dots menu `...`.
 4. Choose **Install from VSIX...**.
-5. Select `ini-brain-ai-1.1.0.vsix`.
+5. Select `ini-brain-ai-1.3.0.vsix`.
 6. Run **Developer: Reload Window**.
 
 Or install from terminal:
 
 ```bash
-code --install-extension ini-brain-ai-1.1.0.vsix --force
+code --install-extension ini-brain-ai-1.3.0.vsix --force
 ```
 
 ---
@@ -260,7 +260,7 @@ Recommended habit:
 
 MCP means **Model Context Protocol**. It is a standard way for AI agents such as Cline to call external tools.
 
-INI Brain AI includes a local MCP server. It does **not** require online hosting, a cloud server, or an external database. Cline runs it locally through Node.js using stdio.
+INI Brain AI includes a local MCP server. It does **not** require online hosting, a cloud server, an external database, or bundled MCP SDK dependencies. Cline runs it locally through Node.js using stdio.
 
 Available MCP tools:
 

@@ -41,6 +41,31 @@ export class BrainManager {
     return this.persist(index);
   }
 
+  /**
+   * H4 fix: apply a whole batch of file watcher changes against a single
+   * in-memory index, then persist ONCE. Previously each changed file triggered
+   * a full project_map + dependency graph + architecture rebuild + disk write.
+   */
+  async applyBatch(changes: Array<{ absPath: string; kind: 'change' | 'delete' }>): Promise<BrainData | undefined> {
+    if (changes.length === 0) return undefined;
+    const index = await this.store.readFileIndex();
+    let mutated = false;
+
+    for (const { absPath, kind } of changes) {
+      const rel = path.relative(this.root, absPath).split(path.sep).join('/');
+      if (kind === 'delete') {
+        if (index[rel]) { delete index[rel]; mutated = true; }
+      } else {
+        const record = await this.scanner.scanSingle(absPath, index[rel]);
+        if (record) { index[record.path] = record; mutated = true; }
+      }
+    }
+
+    if (!mutated) return undefined;
+    return this.persist(index);
+  }
+
+
   async getBrain(): Promise<BrainData> {
     await this.store.ensure();
     return this.store.readBrain();

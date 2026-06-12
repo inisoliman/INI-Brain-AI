@@ -14,7 +14,9 @@ export interface MemoryEntry {
   createdAt: string;
   updatedAt: string;
   accessCount: number;
+  lastAccessedAt?: string;
 }
+
 
 export interface MemorySearchResult {
   entry: MemoryEntry;
@@ -101,16 +103,18 @@ export class MemoryStore {
       .slice(0, Math.max(1, limit));
 
     if (results.length > 0) {
+      // C2 fix: bump access metadata without touching `updatedAt` (which drives list() ordering).
       const accessed = new Set(results.map(result => result.entry.id));
       const now = new Date().toISOString();
       data.memories = data.memories.map(entry => accessed.has(entry.id)
-        ? { ...entry, accessCount: entry.accessCount + 1, updatedAt: now }
+        ? { ...entry, accessCount: entry.accessCount + 1, lastAccessedAt: now }
         : entry);
       await this.writeAll(data);
     }
 
     return results;
   }
+
 
   async buildProfile(): Promise<ProjectMemoryProfile> {
     const data = await this.readAll();
@@ -167,10 +171,39 @@ export class MemoryStore {
 
   private async writeAll(data: MemoryFile): Promise<void> {
     await fs.mkdir(this.brainDir, { recursive: true });
-    const tmp = `${this.memoriesPath}.tmp-${process.pid}-${Date.now()}`;
-    await fs.writeFile(tmp, JSON.stringify(data, null, 2), 'utf8');
+    // C1 fix: re-read the on-disk file and merge by id so concurrent writers
+    // (the extension + the standalone MCP process) never silently drop each
+    // other's memories. The in-memory `data` is treated as authoritative for
+    // ids it knows about; unknown ids found on disk are preserved.
+    const merged = await this.mergeWithDisk(data);
+    const tmp = `${this.memoriesPath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    await fs.writeFile(tmp, JSON.stringify(merged, null, 2), 'utf8');
     await fs.rename(tmp, this.memoriesPath);
   }
+
+  private async mergeWithDisk(data: MemoryFile): Promise<MemoryFile> {
+    let onDisk: MemoryEntry[] = [];
+    try {
+      const parsed = JSON.parse(await fs.readFile(this.memoriesPath, 'utf8')) as Partial<MemoryFile>;
+      onDisk = Array.isArray(parsed.memories) ? parsed.memories.map(normalizeEntry).filter(Boolean) as MemoryEntry[] : [];
+    } catch {
+      onDisk = [];
+    }
+
+    const byId = new Map<string, MemoryEntry>();
+    // Disk entries first so in-memory edits override them, but unknown disk ids survive.
+    for (const entry of onDisk) byId.set(entry.id, entry);
+    for (const entry of data.memories) {
+      const prev = byId.get(entry.id);
+      byId.set(entry.id, prev ? mergeEntries(prev, entry) : entry);
+    }
+
+    const memories = [...byId.values()].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return { version: MEMORY_VERSION, generatedAt: new Date().toISOString(), memories };
+  }
+
 
   private generateId(): string {
     return `mem_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
@@ -201,9 +234,27 @@ function normalizeEntry(value: unknown): MemoryEntry | undefined {
     source: isSource(entry.source) ? entry.source : 'manual',
     createdAt: entry.createdAt || now,
     updatedAt: entry.updatedAt || entry.createdAt || now,
-    accessCount: Number.isFinite(entry.accessCount) ? Number(entry.accessCount) : 0
+    accessCount: Number.isFinite(entry.accessCount) ? Number(entry.accessCount) : 0,
+    lastAccessedAt: typeof entry.lastAccessedAt === 'string' ? entry.lastAccessedAt : undefined
   };
 }
+
+/**
+ * Merge two versions of the same memory id (one from disk, one in-memory).
+ * Keeps the newest editable content but never loses access counters.
+ */
+function mergeEntries(a: MemoryEntry, b: MemoryEntry): MemoryEntry {
+  const newer = new Date(b.updatedAt).getTime() >= new Date(a.updatedAt).getTime() ? b : a;
+  const lastAccessTimes = [a.lastAccessedAt, b.lastAccessedAt].filter(Boolean) as string[];
+  return {
+    ...newer,
+    accessCount: Math.max(a.accessCount, b.accessCount),
+    lastAccessedAt: lastAccessTimes.length
+      ? lastAccessTimes.sort((x, y) => new Date(y).getTime() - new Date(x).getTime())[0]
+      : undefined
+  };
+}
+
 
 function scoreEntry(entry: MemoryEntry, terms: string[]): { score: number; matches: string[] } {
   const fields = {

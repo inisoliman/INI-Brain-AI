@@ -62,7 +62,13 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       ['Generate Project', 'projectBrain.generateProject', 'primary'],
       ['Agent Guide', 'projectBrain.generateAgentGuide', 'secondary'],
       ['Skills & Workflow', 'projectBrain.generateSkillsWorkflow', 'secondary'],
+      ['Onboarding', 'projectBrain.generateOnboarding', 'secondary'],
+      ['Explain File', 'projectBrain.explainFile', 'secondary'],
+      ['Analyze Impact', 'projectBrain.analyzeImpact', 'secondary'],
+      ['Quality Guards', 'projectBrain.generateGuards', 'secondary'],
+      ['Restore Backup', 'projectBrain.restoreBackup', 'secondary'],
       ['Copy for Cline', 'projectBrain.copyContextForCline', 'secondary'],
+
       ['Save Memory', 'projectBrain.saveMemory', 'primary'],
       ['Search Memory', 'projectBrain.searchMemory', 'secondary'],
       ['Memory Profile', 'projectBrain.showMemoryProfile', 'secondary'],

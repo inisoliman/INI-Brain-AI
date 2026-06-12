@@ -28,18 +28,17 @@ export class BrainFileWatcher implements vscode.Disposable {
   }
 
   private async flush(): Promise<void> {
-    const batch = [...this.pending.entries()];
+    const batch = [...this.pending.entries()].map(([absPath, kind]) => ({ absPath, kind }));
     this.pending.clear();
     try {
-      for (const [file, kind] of batch) {
-        if (kind === 'delete') await this.manager.removeFile(file);
-        else await this.manager.updateFile(file);
-      }
+      // H4 fix: persist the whole debounced batch in a single rebuild/write.
+      await this.manager.applyBatch(batch);
       this.onDidUpdate();
     } catch (e) {
       this.onError(e);
     }
   }
+
 
   dispose(): void {
     this.watcher?.dispose();

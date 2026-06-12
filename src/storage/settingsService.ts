@@ -5,7 +5,9 @@ export interface AiSettings {
   apiKey?: string;
   modelName: string;
   hasApiKey: boolean;
+  requestTimeoutMs: number;
 }
+
 
 export class SettingsService {
   private static readonly KEY = 'projectBrain.apiKey';
@@ -19,8 +21,10 @@ export class SettingsService {
       apiBaseUrl: cfg.get('apiBaseUrl', 'https://api.puter.com/puterai/openai/v1/'),
       apiKey,
       hasApiKey: Boolean(apiKey),
-      modelName: cfg.get('modelName', 'anthropic/claude-3-5-sonnet')
+      modelName: cfg.get('modelName', 'anthropic/claude-3-5-sonnet'),
+      requestTimeoutMs: clampTimeout(cfg.get('requestTimeoutMs', 120_000))
     };
+
   }
 
   async save(apiBaseUrl: string, modelName: string, apiKey?: string): Promise<void> {
@@ -47,3 +51,11 @@ export class SettingsService {
     if (!modelName.trim()) throw new Error('Model Name مطلوب.');
   }
 }
+
+function clampTimeout(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n <= 0) return 120_000;
+  // Keep between 5s and 10min to avoid pathological values from user config.
+  return Math.max(5_000, Math.min(600_000, Math.round(n)));
+}
+

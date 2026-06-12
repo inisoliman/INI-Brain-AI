@@ -106,8 +106,17 @@ export class ProjectScanner {
   }
 
   private isCandidate(absPath: string): boolean {
-    return absPath.startsWith(this.root) && !isIgnoredPath(absPath) && isTextLike(absPath);
+    return this.isInsideRoot(absPath) && !isIgnoredPath(absPath) && isTextLike(absPath);
   }
+
+  // H1 fix: a plain startsWith(root) wrongly matches sibling dirs like `root-backup`.
+  // Require an exact match or a real path-separator boundary.
+  private isInsideRoot(absPath: string): boolean {
+    if (absPath === this.root) return true;
+    const rootWithSep = this.root.endsWith(path.sep) ? this.root : `${this.root}${path.sep}`;
+    return absPath.startsWith(rootWithSep);
+  }
+
 
   private extractImports(content: string): string[] {
     const found = new Set<string>();
